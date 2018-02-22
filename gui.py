@@ -17,7 +17,7 @@ class MainWindow:
         self.main_frame.bind('c', self.cardiac_data)
         self.main_frame.bind('<Escape>', self.quit)
         
-        # Cam frames will sit here
+        # Cam frames
         self.left_frame = tk.Frame(self.main_frame)
 
         # Instructions and buttons
@@ -47,8 +47,22 @@ class MainWindow:
         self.main_frame.focus()
         self.main_frame.pack()
 
+        self.video_feed = None
         self.start_toggle = False
         self.cardiac_data_toggle = False
+
+    def show_frame(self, frame):
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        image = Image.fromarray(image)
+        image = ImageTk.PhotoImage(image)
+
+        if self.video_feed is None:
+            self.video_feed = tk.Label(self.left_frame, image=image, borderwidth=2, relief="solid")
+            self.video_feed.image = image
+            self.video_feed.pack()
+        else:
+            self.video_feed.configure(image=image)
+            self.video_feed.image = image
 
     def start_stop(self, event=None):
         return

@@ -15,6 +15,7 @@ class ImageProcessor(object):
         self.frame_in = np.zeros((1, 1))
         self.frame_out = np.zeros((1, 1))
         self.grey_frame = np.zeros((1, 1))
+        self.label_colour = (0, 255, 0)
         self.fps = 0
         self.no_of_avgs_limit = 250
         self.forehead_colour_avgs = []

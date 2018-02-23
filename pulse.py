@@ -1,3 +1,4 @@
+from image_processor import ImageProcessor
 from webcam import WebCam
 
 
@@ -12,7 +13,7 @@ class PulseDetector(object):
         self.pulse_detector_ui = ui
 
         # Handles all image processing, signal analysis, face detection etc
-        self.processor = None
+        self.processor = ImageProcessor()
 
     def toggle_search(self):
         # Lock on found face and begin pulse detection / Find faces
@@ -24,9 +25,9 @@ class PulseDetector(object):
         frame = self.web_cam.get_frame()
         self.height, self.width, depth = frame.shape
 
-        # set current image frame to the processor's input - not implemented
+        # set current image frame to the processor's input
         self.processor.frame_in = frame
-        # process the image frame to perform all needed analysis - not implemented
+        # process the image frame to perform all needed analysis
         self.processor.find_and_detect()
         # collect the output frame for display
         output_frame = self.processor.frame_out

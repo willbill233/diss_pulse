@@ -1,4 +1,6 @@
+import cv2
 import tkinter as tk
+from PIL import Image, ImageTk
 from pulse import PulseDetector
 
 
@@ -30,7 +32,12 @@ class MainWindow:
         self.instruction_label.place()
 
         self.instructions_label = tk.Label(self.right_frame,
-                                           text='Instuctions: ...',
+                                           text='1) Remove any eyewear.\n'
+                                                '2) Wait for your face to be detected.\n'
+                                                '3) Ensure hair is not obstructing your forehead.\n'
+                                                '4) Hit \'Start\' or \'S\' to begin.\n'
+                                                '5) Hit \'Cardiac Data\' or \'C\' to see ECG-type plots.\n'
+                                                '6) Hit \'Quit\' or \'ESC\' to quit the application.',
                                            justify='left')
         self.instructions_label.pack(fill='both')
         self.instructions_label.place()
@@ -65,7 +72,10 @@ class MainWindow:
             self.video_feed.image = image
 
     def start_stop(self, event=None):
-        return
+        self.start_toggle = not self.start_toggle
+        self.start_stop_text = 'Stop' if self.start_toggle else 'Start'
+        self.start_button.config(text=self.start_stop_text)
+        self.app.toggle_search()
 
     def cardiac_data(self, event=None):
         return

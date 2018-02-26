@@ -1,7 +1,90 @@
 import cv2
+import numpy as np
 import tkinter as tk
 from PIL import Image, ImageTk
 from pulse import PulseDetector
+import matplotlib
+import matplotlib.animation as anim
+from matplotlib import style
+matplotlib.use("TkAgg")
+style.use("dark_background")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+
+
+class PlotWindow(tk.Toplevel):
+    def __init__(self, original):
+        tk.Toplevel.__init__(self)
+        self.geometry('900x900')
+        self.original = original
+
+        frame = tk.Frame(self)
+        frame.pack(fill='both')
+
+        # Figure to show how consistent the samples being processed are
+        # I.E how still the subject is keeping their forehead.
+        # Good indicator of accuracy.
+        self.rgb_samples_figure = Figure(figsize=(7, 3), dpi=100)
+        self.time_samples = self.rgb_samples_figure.add_subplot(111)
+        self.time_samples.yaxis.set_visible(False)
+        self.time_samples_canvas = FigureCanvasTkAgg(self.rgb_samples_figure, master=frame)
+        self.time_samples_canvas.show()
+        self.time_samples_canvas.get_tk_widget().pack(fill='both')
+
+        # Mayer Waves, Attempting to be similar to the output of an ECG device.
+        self.bpm_figure = Figure(figsize=(7, 3), dpi=100)
+        self.bpm_fft = self.bpm_figure.add_subplot(111)
+        self.bpm_fft.yaxis.set_visible(False)
+        self.bpm_fft_canvas = FigureCanvasTkAgg(self.bpm_figure, master=frame)
+        self.bpm_fft_canvas.show()
+        self.bpm_fft_canvas.get_tk_widget().pack(fill='both')
+
+        self.signal_figure = Figure(figsize=(7, 3), dpi=100)
+        self.heart_signal = self.signal_figure.add_subplot(111)
+        self.heart_signal.yaxis.set_visible(False)
+        self.heart_signal_canvas = FigureCanvasTkAgg(self.signal_figure, master=frame)
+        self.heart_signal_canvas.show()
+        self.heart_signal_canvas.get_tk_widget().pack(fill='both')
+
+        self.bpm_ani = anim.FuncAnimation(self.bpm_figure, self.animate_bpm)
+        self.bpm = None
+        self.fft = None
+        self.samples_ani = anim.FuncAnimation(self.rgb_samples_figure, self.animate_samples)
+        self.time = None
+        self.samples = None
+        self.signal_ani = anim.FuncAnimation(self.signal_figure, self.animate_signals)
+        self.even_times = None
+        self.filtered_fft = None
+
+    def plot_time_samples(self, x, y):
+        self.time = np.array(x)
+        self.samples = np.array(y)
+
+    def plot_bpm_fft(self, x, y):
+        self.bpm = np.array(x)
+        self.fft = np.array(y)
+
+    def plot_heart_signal(self, x, y):
+        self.even_times = np.array(x)
+        self.filtered_fft = np.array(y)
+
+    def animate_bpm(self, i):
+        self.bpm_fft.clear()
+        self.bpm_fft.plot(self.bpm, self.fft, '-b')
+        if len(self.fft) > 5 and len(self.bpm) > 5:
+            ymax = np.amax(self.fft)
+            xpos = np.argmax(self.fft)
+            xmax = self.bpm[xpos]
+            text = '{:0.1f} BPM'.format(xmax)
+            self.bpm_fft.annotate(text, xy=(xmax, ymax), xytext=(xmax, ymax), color='white')
+
+    def animate_samples(self, i):
+        self.time_samples.clear()
+        self.time_samples.plot(self.time, self.samples, '-r')
+
+    def animate_signals(self, i):
+        self.heart_signal.clear()
+        self.heart_signal.plot(self.even_times, self.filtered_fft, '-g')
 
 
 class MainWindow:
@@ -78,7 +161,21 @@ class MainWindow:
         self.app.toggle_search()
 
     def cardiac_data(self, event=None):
-        return
+        if self.__cardiac_window:
+            self.__cardiac_window.destroy()
+            self.__cardiac_window = None
+        else:
+            self.__cardiac_window = PlotWindow(self)
+        self.app.toggle_cardiac_data()
+
+    def plot_time_samples(self, time, samples):
+        self.__cardiac_window.plot_time_samples(time, samples)
+
+    def plot_bpm_fft(self, bpm, fft):
+        self.__cardiac_window.plot_bpm_fft(bpm, fft)
+
+    def plot_heart_signal(self, even_times, filtered_fft):
+        self.__cardiac_window.plot_heart_signal(even_times, filtered_fft)
 
     def quit(self, event=None):
         self.master.destroy()

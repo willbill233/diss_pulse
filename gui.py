@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import pandas as pd
 import tkinter as tk
 from PIL import Image, ImageTk
 from pulse import PulseDetector
@@ -132,6 +133,14 @@ class MainWindow:
         self.cardiac_button.pack()
         self.quit_button = tk.Button(self.right_frame, text='Quit', command=self.quit, width=50)
         self.quit_button.pack()
+        self.error_message = tk.Label(self.right_frame, text='', foreground='red')
+        self.error_message.pack()
+        self.actual_bpm_label = tk.Label(self.right_frame, text="Actual BPM: ")
+        self.actual_bpm_label.pack(side='left')
+        self.actual_bpm = tk.Entry(self.right_frame, justify='right')
+        self.actual_bpm.pack(side='left')
+        self.save_button = tk.Button(self.right_frame, text='Save', command=self.save_record, width=15)
+        self.save_button.pack(side='left', padx=5)
         self.left_frame.pack(side='left')
         self.right_frame.pack(side='left')
         self.main_frame.focus()
@@ -176,6 +185,26 @@ class MainWindow:
 
     def plot_heart_signal(self, even_times, filtered_fft):
         self.__cardiac_window.plot_heart_signal(even_times, filtered_fft)
+
+    def save_record(self):
+        try:
+            self.error_message.config(text='', foreground='red')
+
+            bpm = float(self.actual_bpm.get())
+            data = self.app.processor.get_example()
+            if not data:
+                self.error_message.config(text='Start/Wait until the estimation is stable before saving')
+                return
+
+            data['bpm_actual'] = bpm
+            df = pd.DataFrame(data=data, index=[0])
+            df.reindex_axis(sorted(df.columns), axis=1)
+            with open('train.csv', 'a') as train:
+                df.to_csv(train, header=False)
+                self.error_message.config(text='Save successful!', foreground='green')
+        except ValueError:
+            self.error_message.config(text='Please enter a number.')
+            return
 
     def quit(self, event=None):
         self.master.destroy()

@@ -44,8 +44,8 @@ class ICA(object):
         power_ratio3 = np.sum(comp3)/np.amax(comp3)
 
         if power_ratio1 > power_ratio2 and power_ratio1 > power_ratio2:
-            return signal1
+            return {'signal': signal1, 'component': comp1}
         elif power_ratio2 > power_ratio1 and power_ratio2 > power_ratio3:
-            return signal2
+            return {'signal': signal2, 'component': comp2}
         else:
-            return signal3
+            return {'signal': signal3, 'component': comp3}

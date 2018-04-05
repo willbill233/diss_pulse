@@ -39,7 +39,7 @@ class PulseDetector(object):
     def make_cardiac_plot(self):
         # Makes cardiac plots
         self.pulse_detector_ui.plot_time_samples(self.processor.times, self.processor.samples)
-        self.pulse_detector_ui.plot_bpm_fft(self.processor.raw_freqs, self.processor.fft)
+        self.pulse_detector_ui.plot_bpm_fft(self.processor.bpms, self.processor.relevant_fft)
         self.pulse_detector_ui.plot_heart_signal(self.processor.even_times, self.processor.filtered)
 
     def main_loop(self):

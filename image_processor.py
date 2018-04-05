@@ -4,7 +4,7 @@ import time
 import cv2
 import os
 from ica import ICA
-from sklearn import linear_model
+from sklearn import linear_model, svm
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 
@@ -20,6 +20,7 @@ class ImageProcessor(object):
         self.frame_out = np.zeros((1, 1))
         self.grey_frame = np.zeros((1, 1))
         self.ica = ICA()
+        self.selected_component = []
         self.label_colour = (0, 255, 0)
         self.fps = 0
         self.gap = 1
@@ -32,53 +33,61 @@ class ImageProcessor(object):
         self.samples = []
         self.angles = []
         self.raw_freqs = []
+        self.bpms = []
         self.fft = []
+        self.relevant_fft = []
         self.filtered = []
         self.even_times = []
         self.roi = [[0]]
         self.start_time = time.time()
         self.bpm = 0
-        # self.bpm_regressor = 0
+        self.bpm_regressor = 0
         self.face_rect = [1, 1, 1, 1]
         self.last_centre_coords = np.array([0, 0])
         self.find_faces = True
-    #     # ml values specific vals
-    #     data = pd.read_csv('work_train.csv', header=0)
-    #     attributes = data.loc[:, data.columns != 'bpm_actual']
-    #     attributes = attributes.as_matrix()
-    #     targets = np.array(data.bpm_actual.values)
-    #
-    #     attributes_train = attributes[:-33]
-    #     attributes_test = attributes[-33:]
-    #     targets_train = targets[:-33]
-    #     targets_test = targets[-33:]
-    #
-    #     self.regressor = linear_model.LinearRegression()
-    #     self.regressor.fit(attributes_train, targets_train)
-    #     target_predictions = self.regressor.predict(attributes_test)
-    #     # The coefficients
-    #     print('Coefficients: \n', self.regressor.coef_)
-    #     # The mean squared error
-    #     print("Mean absolute error: %.2f"
-    #           % mean_absolute_error(targets_test, target_predictions))
-    #     # The mean squared error
-    #     print("Mean squared error: %.2f"
-    #           % mean_squared_error(targets_test, target_predictions))
-    #     # Explained variance score: 1 is perfect prediction
-    #     print('Variance score: %.2f' % r2_score(targets_test, target_predictions))
-    #
-    # def get_example(self):
-    #     if self.gap or self.find_faces:
-    #         return False
-    #     data = {
-    #         'bpm_estimate': self.bpm
-    #     }
-    #     for frame_no in np.arange(self.no_of_avgs_limit - 30, self.no_of_avgs_limit):
-    #         data['r_avg' + str(frame_no)] = self.r_avgs[frame_no]
-    #         data['g_avg' + str(frame_no)] = self.g_avgs[frame_no]
-    #         data['b_avg' + str(frame_no)] = self.b_avgs[frame_no]
-    #         data['roi_avg' + str(frame_no)] = self.forehead_colour_avgs[frame_no]
-    #     return data
+        # ml values specific vals
+        data = pd.read_csv('train.csv', header=0)
+        self.NO_INPUT_ATTR = len(data.columns) - 1
+        attributes = data.loc[:, data.columns != 'frequency_actual']
+        attributes = attributes.as_matrix()
+        targets = np.array(data.frequency_actual.values)
+
+        cut = round((len(attributes) / 5) * -1)  # 5:1
+        attributes_train = attributes[:cut]
+        attributes_test = attributes[cut:]
+        targets_train = targets[:cut]
+        targets_test = targets[cut:]
+
+        self.regressor = svm.SVR()
+        self.regressor.fit(attributes_train, targets_train)
+        target_predictions = self.regressor.predict(attributes_test)
+        # # The coefficients
+        # print('Coefficients: \n', self.regressor.coef_)
+        # The mean squared error
+        print("Mean absolute error: %.2f"
+              % mean_absolute_error(targets_test, target_predictions))
+        # The mean squared error
+        print("Mean squared error: %.2f"
+              % mean_squared_error(targets_test, target_predictions))
+        # Explained variance score: 1 is perfect prediction
+        print('Variance score: %.2f' % r2_score(targets_test, target_predictions))
+
+    def get_example(self):
+        if self.gap or self.find_faces:
+            return False
+        data = {
+            'frequency_estimate': self.bpm / 60.,
+            'fft_mean': np.mean(self.fft),
+            'raw_freqs_mean': np.mean(self.raw_freqs),
+            'component_mean': np.mean(self.selected_component)
+        }
+        for i in np.arange(0, len(self.fft)):
+            data['fft' + str(i)] = self.fft[i]
+            data['raw_freqs' + str(i)] = self.raw_freqs[i]
+        for i in np.arange(0, len(self.selected_component)):
+            data['component' + str(i)] = self.selected_component[i]
+
+        return data
 
     def find_faces_toggle(self):
         self.find_faces = not self.find_faces
@@ -146,7 +155,7 @@ class ImageProcessor(object):
         self.fft = np.abs(transformed)
         self.raw_freqs = float(self.fps) / no_of_examples * np.arange(no_of_examples / 2 + 1)
 
-        relevant_ids = np.where((self.raw_freqs > 50/60.) & (self.raw_freqs < 180/60.))
+        relevant_ids = np.where((self.raw_freqs > 50/60.) & (self.raw_freqs < 150/60.))
         x = 0 * transformed
         x[relevant_ids] = transformed[relevant_ids]
         self.filtered = np.fft.irfft(x)
@@ -181,7 +190,7 @@ class ImageProcessor(object):
                                                                      scaleFactor=1.3))
 
             if len(detected_rects) > 0:
-                # Sort by area or rectangles
+                # Sort by area of rectangles
                 detected_rects.sort(key=lambda rect: rect[-1] * rect[-2])
                 if self.rect_movement(detected_rects[-1]) > 10:
                     self.face_rect = detected_rects[-1]  # Largest rect
@@ -208,35 +217,39 @@ class ImageProcessor(object):
         self.samples = processed
         if no_of_avgs > 10:
             signals = self.ica.analyse_rgb_channels([self.r_avgs, self.g_avgs, self.b_avgs], no_of_avgs)
-            selected_signal = self.ica.select_pertinent_signal(signals)
+            selected_component = self.ica.select_pertinent_signal(signals)
+            selected_signal = selected_component['signal']
+            self.selected_component = selected_component['component']
             self.get_transformed_values(selected_signal)
             # Grab element id's when they're within normal bpm params
-            freqs = 60.0 * self.raw_freqs
-            ids = np.where((freqs > 50) & (freqs < 150))
+            bpms = 60.0 * self.raw_freqs
+            ids = np.where((bpms > 50) & (bpms < 150))
 
             relevant_values = self.fft[ids]  # Grab absolute values the ids correspond with
             relevant_angles = self.angles[ids]  # Grab angles in radians the ids correspond with
-            relevant_freqs = freqs[ids]  # Grab the actual frequents the ids correspond with
+            relevant_bpms = bpms[ids]  # Grab the actual frequents the ids correspond with
 
-            self.raw_freqs = relevant_freqs
-            self.fft = relevant_values
+            self.bpms = relevant_bpms
+            self.relevant_fft = relevant_values
             if len(relevant_values) <= 0:
                 return
 
             # Grab id of largest relevant value and use this to grab the bpm estimation
             max_id = np.argmax(relevant_values)
             forehead = self.forehead_rect()
-            self.bpm = self.raw_freqs[max_id]
+            if self.gap or (self.bpm - 20 < self.bpms[max_id] < self.bpm + 20):
+                self.bpm = self.bpms[max_id]
+
             self.sync_light_intensity_changes(relevant_angles[max_id], forehead)
 
-            # data = self.get_example()
-            # if data:
-            #     df = pd.DataFrame(data=data, index=[0])
-            #     df.reindex_axis(sorted(df.columns), axis=1)
-            #     example_array = df.as_matrix()
-            #     prediction = self.regressor.predict(example_array)
-            #     if self.bpm - 5 < prediction < self.bpm + 5:
-            #         self.bpm_regressor = prediction[0]
+            data = self.get_example()
+            if data:
+                df = pd.DataFrame(data=data, index=[0])
+                if len(df.columns) == self.NO_INPUT_ATTR:
+                    df.reindex_axis(sorted(df.columns), axis=1)
+                    example_array = df.as_matrix()
+                    prediction = self.regressor.predict(example_array)
+                    self.bpm_regressor = prediction[0] * 60.
 
             # Draw bpm estimation on screen with label
             fx, fy, fw, fh = self.face_rect
@@ -248,5 +261,5 @@ class ImageProcessor(object):
                 text = "Estimate: %0.1f bpm, stable in %0.0f s" % (self.bpm, self.gap)
             cv2.putText(self.frame_out, text,
                         (int(fhx - fhw / 2), int(fhy - 5)), cv2.FONT_HERSHEY_PLAIN, 1, self.label_colour)
-            # cv2.putText(self.frame_out, 'Machine learning estimate: %0.1f bpm' % self.bpm_regressor,
-            #             (5, 470), cv2.FONT_HERSHEY_PLAIN, 1, self.label_colour)
+            cv2.putText(self.frame_out, 'Machine learning estimate: %0.1f bpm' % self.bpm_regressor,
+                        (5, 470), cv2.FONT_HERSHEY_PLAIN, 1, self.label_colour)

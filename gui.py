@@ -196,7 +196,7 @@ class MainWindow:
                 self.error_message.config(text='Start/Wait until the estimation is stable before saving')
                 return
 
-            data['bpm_actual'] = bpm
+            data['frequency_actual'] = bpm / 60.
             df = pd.DataFrame(data=data, index=[0])
             df.reindex_axis(sorted(df.columns), axis=1)
             with open('train.csv', 'a') as train:

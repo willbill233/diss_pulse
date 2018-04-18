@@ -4,8 +4,13 @@ import time
 import cv2
 import os
 from ica import ICA
-from sklearn import linear_model, svm
+from sklearn import gaussian_process
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import rpy2.robjects as robjects
+from rpy2.robjects import r
+from rpy2.robjects.numpy2ri import numpy2ri
+from rpy2.robjects.packages import importr
 
 
 class ImageProcessor(object):
@@ -45,8 +50,10 @@ class ImageProcessor(object):
         self.face_rect = [1, 1, 1, 1]
         self.last_centre_coords = np.array([0, 0])
         self.find_faces = True
+        self.REG_PREDICTIONS = []
+
         # ml values specific vals
-        data = pd.read_csv('train.csv', header=0)
+        data = pd.read_csv('train_fft.csv', header=0)
         self.NO_INPUT_ATTR = len(data.columns) - 1
         attributes = data.loc[:, data.columns != 'frequency_actual']
         attributes = attributes.as_matrix()
@@ -57,8 +64,8 @@ class ImageProcessor(object):
         attributes_test = attributes[cut:]
         targets_train = targets[:cut]
         targets_test = targets[cut:]
-
-        self.regressor = svm.SVR()
+        kernel = C(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2))
+        self.regressor = gaussian_process.GaussianProcessRegressor(kernel=kernel)
         self.regressor.fit(attributes_train, targets_train)
         target_predictions = self.regressor.predict(attributes_test)
         # # The coefficients
@@ -72,20 +79,38 @@ class ImageProcessor(object):
         # Explained variance score: 1 is perfect prediction
         print('Variance score: %.2f' % r2_score(targets_test, target_predictions))
 
+        # # Converting the dataframe from python to R
+        #
+        # # firt take the values of the dataframe to numpy
+        # resi1 = np.array(data, dtype=float)
+        #
+        # # Taking the variable from Python to R
+        # r_resi = numpy2ri(resi1)
+        #
+        # # Creating this variable in R (from python)
+        # r.assign("resi", r_resi)
+        #
+        # # Calling libraries in R
+        # r('library("MVN")')
+        #
+        # # Calling a function in R (from python)
+        # r("res <- mvn(resi, mvnTest = c(\"hz\"))")
+        #
+        # # Retrieving information from R to Python
+        # r_result = r("res")
+        #
+        # # Printing the output in python
+        # print(r_result)
+
     def get_example(self):
         if self.gap or self.find_faces:
             return False
         data = {
             'frequency_estimate': self.bpm / 60.,
-            'fft_mean': np.mean(self.fft),
-            'raw_freqs_mean': np.mean(self.raw_freqs),
-            'component_mean': np.mean(self.selected_component)
+            'fft_mean': np.mean(self.fft)
         }
         for i in np.arange(0, len(self.fft)):
             data['fft' + str(i)] = self.fft[i]
-            data['raw_freqs' + str(i)] = self.raw_freqs[i]
-        for i in np.arange(0, len(self.selected_component)):
-            data['component' + str(i)] = self.selected_component[i]
 
         return data
 
@@ -249,7 +274,11 @@ class ImageProcessor(object):
                     df.reindex_axis(sorted(df.columns), axis=1)
                     example_array = df.as_matrix()
                     prediction = self.regressor.predict(example_array)
-                    self.bpm_regressor = prediction[0] * 60.
+                    if ((prediction[0] * 60) - 5) < self.bpm < ((prediction[0] * 60) + 5):
+                        self.REG_PREDICTIONS.append(prediction[0] * 60.)
+                        if len(self.REG_PREDICTIONS) == 5:
+                            self.bpm_regressor = np.array(self.REG_PREDICTIONS).mean()
+                            self.REG_PREDICTIONS = []
 
             # Draw bpm estimation on screen with label
             fx, fy, fw, fh = self.face_rect

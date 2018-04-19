@@ -25,6 +25,7 @@ class ICA(object):
             array[i] = ((array[i] - mean) / std)
         return array
 
+    # noinspection PyTypeChecker,PyTypeChecker
     @staticmethod
     def select_pertinent_signal(signals):
         signal1 = np.squeeze(np.asarray(signals[:, 0])).tolist()

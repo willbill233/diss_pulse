@@ -70,6 +70,7 @@ class PlotWindow(tk.Toplevel):
         self.filtered_fft = np.array(y)
 
     def animate_bpm(self, i):
+        int(i)
         self.bpm_fft.clear()
         self.bpm_fft.plot(self.bpm, self.fft, '-b')
         if len(self.fft) > 5 and len(self.bpm) > 5:
@@ -80,10 +81,12 @@ class PlotWindow(tk.Toplevel):
             self.bpm_fft.annotate(text, xy=(xmax, ymax), xytext=(xmax, ymax), color='white')
 
     def animate_samples(self, i):
+        int(i)
         self.time_samples.clear()
         self.time_samples.plot(self.time, self.samples, '-r')
 
     def animate_signals(self, i):
+        int(i)
         self.heart_signal.clear()
         self.heart_signal.plot(self.even_times, self.filtered_fft, '-g')
 
@@ -163,13 +166,13 @@ class MainWindow:
             self.video_feed.configure(image=image)
             self.video_feed.image = image
 
-    def start_stop(self, event=None):
+    def start_stop(self):
         self.start_toggle = not self.start_toggle
         self.start_stop_text = 'Stop' if self.start_toggle else 'Start'
         self.start_button.config(text=self.start_stop_text)
         self.app.toggle_search()
 
-    def cardiac_data(self, event=None):
+    def cardiac_data(self):
         if self.__cardiac_window:
             self.__cardiac_window.destroy()
             self.__cardiac_window = None
@@ -207,7 +210,7 @@ class MainWindow:
             self.error_message.config(text='Please enter a number.')
             return
 
-    def quit(self, event=None):
+    def quit(self):
         self.master.destroy()
 
 

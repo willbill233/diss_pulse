@@ -5,12 +5,12 @@ import cv2
 import os
 from ica import ICA
 from sklearn import gaussian_process
-from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel as cK
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import rpy2.robjects as robjects
-from rpy2.robjects import r
-from rpy2.robjects.numpy2ri import numpy2ri
-from rpy2.robjects.packages import importr
+# import rpy2.robjects as robjects
+# from rpy2.robjects import r
+# from rpy2.robjects.numpy2ri import numpy2ri
+# from rpy2.robjects.packages import importr
 
 
 class ImageProcessor(object):
@@ -36,10 +36,10 @@ class ImageProcessor(object):
         self.b_avgs = []
         self.times = []
         self.samples = []
-        self.angles = []
-        self.raw_freqs = []
+        self.angles = np.zeros(1)
+        self.raw_freqs = np.zeros(1)
         self.bpms = []
-        self.fft = []
+        self.fft = np.zeros(1)
         self.relevant_fft = []
         self.filtered = []
         self.even_times = []
@@ -64,7 +64,7 @@ class ImageProcessor(object):
         attributes_test = attributes[cut:]
         targets_train = targets[:cut]
         targets_test = targets[cut:]
-        kernel = C(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2))
+        kernel = cK(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2))
         self.regressor = gaussian_process.GaussianProcessRegressor(kernel=kernel)
         self.regressor.fit(attributes_train, targets_train)
         target_predictions = self.regressor.predict(attributes_test)
@@ -180,7 +180,7 @@ class ImageProcessor(object):
         self.fft = np.abs(transformed)
         self.raw_freqs = float(self.fps) / no_of_examples * np.arange(no_of_examples / 2 + 1)
 
-        relevant_ids = np.where((self.raw_freqs > 50/60.) & (self.raw_freqs < 150/60.))
+        relevant_ids = np.where((self.raw_freqs > 50 / 60.) & (self.raw_freqs < 150 / 60.))
         x = 0 * transformed
         x[relevant_ids] = transformed[relevant_ids]
         self.filtered = np.fft.irfft(x)

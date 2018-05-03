@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import tkinter as tk
+import platform
 from PIL import Image, ImageTk
 from pulse import PulseDetector
 import matplotlib
@@ -156,6 +157,8 @@ class MainWindow:
     def show_frame(self, frame):
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(image)
+        if platform.system() == 'Darwin':
+            image = image.resize((600,420), Image.ANTIALIAS)
         image = ImageTk.PhotoImage(image)
 
         if self.video_feed is None:
